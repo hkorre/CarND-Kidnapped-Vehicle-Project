@@ -106,17 +106,41 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
 
 void ParticleFilter::updateWeights(double sensor_range, double std_landmark[], 
 		std::vector<LandmarkObs> observations, Map map_landmarks) {
-	// TODO: Update the weights of each particle using a mult-variate Gaussian distribution. You can read
-	//   more about this distribution here: https://en.wikipedia.org/wiki/Multivariate_normal_distribution
-	// NOTE: The observations are given in the VEHICLE'S coordinate system. Your particles are located
-	//   according to the MAP'S coordinate system. You will need to transform between the two systems.
-	//   Keep in mind that this transformation requires both rotation AND translation (but no scaling).
-	//   The following is a good resource for the theory:
-	//   https://www.willamette.edu/~gorr/classes/GeneralGraphics/Transforms/transforms2d.htm
-	//   and the following is a good resource for the actual equation to implement (look at equation 
-	//   3.33. Note that you'll need to switch the minus sign in that equation to a plus to account 
-	//   for the fact that the map's y-axis actually points downwards.)
-	//   http://planning.cs.uiuc.edu/node99.html
+  // TODO: Update the weights of each particle using a mult-variate Gaussian distribution. You can read
+  //   more about this distribution here: https://en.wikipedia.org/wiki/Multivariate_normal_distribution
+  // NOTE: The observations are given in the VEHICLE'S coordinate system. Your particles are located
+  //   according to the MAP'S coordinate system. You will need to transform between the two systems.
+  //   Keep in mind that this transformation requires both rotation AND translation (but no scaling).
+  //   The following is a good resource for the theory:
+  //   https://www.willamette.edu/~gorr/classes/GeneralGraphics/Transforms/transforms2d.htm
+  //   and the following is a good resource for the actual equation to implement (look at equation 
+  //   3.33. Note that you'll need to switch the minus sign in that equation to a plus to account 
+  //   for the fact that the map's y-axis actually points downwards.)
+  //   http://planning.cs.uiuc.edu/node99.html
+
+
+  //TODO: What to do with sensor_range?
+
+  double std_x = std_landmark[0];
+  double std_y = std_landmark[1];
+
+
+  for (auto it_par=particles.begin(); it_par!=particles.end(); ++it_par) {
+
+    // transform each observation marker from the vehicle's coordinates to the map's coordinates
+    for (auto it_obs=observations.begin(); it_obs!=observations.end(); ++it_obs) {
+      //x = x*cos(theta) + y*sin(theta) + xt
+      //y = x*sin(theta) + y*cos(theta) + yt
+
+    }
+
+    // associate each transformed observation with a land mark identifier
+    //   use dataAssociation()
+
+    // calculate the particle's final weight
+
+  }
+  
 }
 
 void ParticleFilter::resample() {
