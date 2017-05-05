@@ -14,6 +14,7 @@
 
 
 #define NUM_PARTICLES  (100)
+#define START_DIST     (1000)
 
 void ParticleFilter::init(double x, double y, double theta, double std[]) {
   // TODO: Set the number of particles. Initialize all particles to first position (based on estimates of 
@@ -79,11 +80,28 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 }
 
 void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::vector<LandmarkObs>& observations) {
-	// TODO: Find the predicted measurement that is closest to each observed measurement and assign the 
-	//   observed measurement to this particular landmark.
-	// NOTE: this method will NOT be called by the grading code. But you will probably find it useful to 
-	//   implement this method and use it as a helper during the updateWeights phase.
+  // TODO: Find the predicted measurement that is closest to each observed measurement and assign the 
+  //   observed measurement to this particular landmark.
+  // NOTE: this method will NOT be called by the grading code. But you will probably find it useful to 
+  //   implement this method and use it as a helper during the updateWeights phase.
 
+  for (auto it_obs=observations.begin(); it_obs!=observations.end(); ++it_obs) {
+    double min_dist_sq = START_DIST;
+    double min_x = 0;
+    double min_y = 0;
+
+    for (auto it_pred=predicted.begin(); it_pred!=predicted.end(); ++it_pred) {
+      double dist_sq = dist(it_obs->x, it_obs->y, it_pred->x, it_pred->y);
+      if (dist_sq < min_dist_sq) {
+        min_dist_sq = dist_sq;
+        min_x = it_pred->x;
+        min_y = it_pred->y;
+      }
+    }
+
+    it_obs->x = min_x;
+    it_obs->y = min_y;
+  }
 }
 
 void ParticleFilter::updateWeights(double sensor_range, double std_landmark[], 
