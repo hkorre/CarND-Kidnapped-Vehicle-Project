@@ -87,17 +87,17 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
 
   for (auto it_obs=observations.begin(); it_obs!=observations.end(); ++it_obs) {
     double min_dist_sq = START_DIST;
-    double min_id = 0;
+    double min_index = 0;
 
     for (auto it_pred=predicted.begin(); it_pred!=predicted.end(); ++it_pred) {
       double dist_sq = dist(it_obs->x, it_obs->y, it_pred->x, it_pred->y);
       if (dist_sq < min_dist_sq) {
         min_dist_sq = dist_sq;
-        min_id = it_pred->id;
+        min_index = it_pred - predicted.begin();
       }
     }
 
-    it_obs->id = min_id;
+    it_obs->id = min_index;
   }
 }
 
@@ -135,17 +135,14 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
   double std_x = std_landmark[0];
   double std_y = std_landmark[1];
 
-  double range_sq = sensor_range*sensor_range;
-
-
 
   for (auto it_par=particles.begin(); it_par!=particles.end(); ++it_par) {
 
     // find landmarks in range of particle that sensor can reach...
     std::vector<LandmarkObs> predicted;
     for (auto it_map=map_landmarks.landmark_list.begin(); it_map!=map_landmarks.landmark_list.end(); ++it_map) {
-      double dist_sq = dist(it_map->x_f, it_map->y_f, it_par->x, it_par->y);
-      if (dist_sq < range_sq) {
+      double distance = dist(it_map->x_f, it_map->y_f, it_par->x, it_par->y);
+      if (distance < sensor_range) {
         struct LandmarkObs new_predicted = {
           it_map->id_i,  //id
           it_map->x_f,   //x
@@ -169,14 +166,27 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
     }
 
     // associate each transformed observation with a land mark identifier
-    //   use dataAssociation()
     dataAssociation(predicted, observations);
 
-    // calculate the particle's final weight
+    // calculate the particle's final weight...
+    double new_weight = 0;
+    for (auto it_obs=observations.begin(); it_obs!=observations.end(); ++it_obs) {
+      double error_x = it_obs->x - predicted[it_obs->id].x;
+      double error_y = it_obs->y - predicted[it_obs->id].y;
 
+      // compute Multivariate-Gaussian probability
+      double gaussian = 1 / (2*M_PI*std_x*std_y);
+      gaussian *= exp(-1*( error_x*error_x / (2*std_x*std_x)));
+      gaussian *= exp(-1*( error_y*error_y / (2*std_y*std_y)));
+
+      // sum together 
+      new_weight += gaussian;
+    }
+
+    // update weight of particle
+    it_par->weight = new_weight;
   }
 
-  
 }
 
 void ParticleFilter::resample() {
