@@ -84,15 +84,22 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
   std::normal_distribution<double> dist_theta(0, std_theta);
 
   for (auto it=particles.begin(); it!=particles.end(); ++it) {
+/*
     if(yaw_rate<EPSILON) {
-      it->x = it->x + velocity*delta_t*cos(it->theta) + dist_x(gen);
-      it->y = it->y + velocity*delta_t*sin(it->theta) + dist_y(gen);
-      it->theta = it->theta + dist_theta(gen);
+      std::cout << "EPSILON" << std::endl;
+      it->x += velocity*delta_t*cos(it->theta) + dist_x(gen);
+      it->y += velocity*delta_t*sin(it->theta) + dist_y(gen);
+      it->theta += dist_theta(gen);
     } else {
+      std::cout << "No EPSILON" << std::endl;
       it->x += (velocity/yaw_rate)*(sin(it->theta + yaw_rate*delta_t) - sin(it->theta)) + dist_x(gen);
       it->y += (velocity/yaw_rate)*(cos(it->theta) - cos(it->theta + yaw_rate*delta_t)) + dist_x(gen);
       it->theta += yaw_rate*delta_t + dist_theta(gen);
     }
+*/
+      it->x += (velocity/yaw_rate)*(sin(it->theta + yaw_rate*delta_t) - sin(it->theta)) + dist_x(gen);
+      it->y += (velocity/yaw_rate)*(cos(it->theta) - cos(it->theta + yaw_rate*delta_t)) + dist_x(gen);
+      it->theta += yaw_rate*delta_t + dist_theta(gen);
   }
 }
 
@@ -136,19 +143,6 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
   //   3.33. 
   //   http://planning.cs.uiuc.edu/node99.html
 
-  // 1. Make list of all landmarks within sensor range of particle, call this `predicted_lm`
-
-
-  // 2. Convert all observations from local to global frame, call this `transformed_obs`
-
-
-  // 3. Perform `dataAssociation`. This will put the index of the `predicted_lm` nearest 
-  //    to each `transformed_obs` in the `id` field of the `transformed_obs` element.
-
-  // 4. Loop through all the `transformed_obs`. Use the saved index in the `id` to find 
-  //    the associated landmark and compute the gaussian. 
-
-  // 5. Multiply all the gaussian values together to get total probability of particle (the weight).
 
   std::cout << "updateWeights()..." << std::endl;
 
@@ -157,7 +151,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 
   double std_x = std_landmark[0];
   double std_y = std_landmark[1];
-  std::cout << " std_lm[0]: " << std_x << " std_lm[1]: " << std_y << std::endl;
+  //std::cout << " std_lm[0]: " << std_x << " std_lm[1]: " << std_y << std::endl;
 
 
   for (auto it_par=particles.begin(); it_par!=particles.end(); ++it_par) {
@@ -260,7 +254,10 @@ void ParticleFilter::resample() {
   std::vector<Particle> new_particles;
   for (int i=0; i<num_particles; i++) {
     int particle_index = distribution(gen); //get random idx based on weights
-     std::cout << "particle_index: " << particle_index << std::endl;
+    if(DEBUG) {
+      std::cout << "particle_index: " << particle_index << std::endl;
+    }
+    particles[particle_index].id = i;
     new_particles.push_back(particles[particle_index]);
   }
 
