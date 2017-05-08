@@ -13,8 +13,12 @@
 #include "particle_filter.h"
 
 
-#define NUM_PARTICLES  (100)
+#define DEBUG    (0)
+
+#define NUM_PARTICLES  (100)  //(100)
 #define START_DIST     (1000)
+
+#define EPSILON        (1e-6)
 
 void ParticleFilter::init(double x, double y, double theta, double std[]) {
   // TODO: Set the number of particles. Initialize all particles to first position (based on estimates of 
@@ -29,7 +33,13 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
   double std_x = std[0];
   double std_y = std[1];
   double std_theta = std[2];	 
-  
+
+  if(DEBUG) {
+    std::cout << "x: " << x << " y: " << y << " theta: " << theta << std::endl;
+    std::cout << "std_x: " << std_x << " std_y: " << std_y << " std_theta: " << std_theta << std::endl;
+  }
+
+
   std::normal_distribution<double> dist_x(x, std_x);
   std::normal_distribution<double> dist_y(y, std_y);
   std::normal_distribution<double> dist_theta(theta, std_theta);
@@ -42,7 +52,14 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
       dist_theta(gen),  //theta
       1                 //weight
     };
-    particles.push_back(new_particle);
+    if(DEBUG) {
+      std::cout << "new_particle: " << std::endl;
+      std::cout << "  i: " << new_particle.id 
+                << " x: " << new_particle.x
+                << " y: " << new_particle.y 
+                << " theta: " << new_particle.theta << std::endl;
+    }
+      particles.push_back(new_particle);
   }
 
   is_initialized = true;
@@ -67,14 +84,14 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
   std::normal_distribution<double> dist_theta(0, std_theta);
 
   for (auto it=particles.begin(); it!=particles.end(); ++it) {
-    if(yaw_rate==0) {
+    if(yaw_rate<EPSILON) {
       it->x = it->x + velocity*delta_t*cos(it->theta) + dist_x(gen);
       it->y = it->y + velocity*delta_t*sin(it->theta) + dist_y(gen);
-      //it->theta = it->theta
+      it->theta = it->theta + dist_theta(gen);
     } else {
       it->x += (velocity/yaw_rate)*(sin(it->theta + yaw_rate*delta_t) - sin(it->theta)) + dist_x(gen);
       it->y += (velocity/yaw_rate)*(cos(it->theta) - cos(it->theta + yaw_rate*delta_t)) + dist_x(gen);
-      it->theta += yaw_rate*delta_t;
+      it->theta += yaw_rate*delta_t + dist_theta(gen);
     }
   }
 }
@@ -98,6 +115,11 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
     }
 
     it_obs->id = min_index;
+
+/*
+    std::cout << "Pred: (" << predicted[min_index].x << "," << predicted[min_index].y << ")"
+              << " Obs: (" << it_obs->x << "," << it_obs->y << ")" << std::endl; 
+*/
   }
 }
 
@@ -128,15 +150,21 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 
   // 5. Multiply all the gaussian values together to get total probability of particle (the weight).
 
+  std::cout << "updateWeights()..." << std::endl;
 
 
   //TODO: What to do with sensor_range?
 
   double std_x = std_landmark[0];
   double std_y = std_landmark[1];
+  std::cout << " std_lm[0]: " << std_x << " std_lm[1]: " << std_y << std::endl;
 
 
   for (auto it_par=particles.begin(); it_par!=particles.end(); ++it_par) {
+
+    if(DEBUG) {
+      std::cout << " particle id: " << it_par->id << std::endl;
+    }
 
     // find landmarks in range of particle that sensor can reach...
     std::vector<LandmarkObs> predicted;
@@ -153,26 +181,38 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
     }
 
     // transform each observations from vehicle frame to the map frame...
+    std::vector<LandmarkObs> obs_inMap;
     for (auto it_obs=observations.begin(); it_obs!=observations.end(); ++it_obs) {
-      double x = it_obs->x;
-      double y = it_obs->y;
-      double theta = it_par->theta;
+      //std::cout << " obs - x: " << x << " y: " << y << std::endl;
 
       //x_obsInMap = x_obsInCar*cos(theta_carInMap) - y_obsInCar*sin(theta_carInMap) + x_carInmap
-      it_obs->x = it_obs->x*cos(it_par->theta) - it_obs->y*sin(it_par->theta) + it_par->x;
+      double x = it_obs->x*cos(it_par->theta) - it_obs->y*sin(it_par->theta) + it_par->x;
 
       //y_obsInMap = x_obsInCar*sin(theta_carInMap) + y_obsInCar*cos(theta_carInMap) + y_carInmap
-      it_obs->y = it_obs->x*sin(it_par->theta)  + it_obs->y*cos(it_par->theta) + it_par->y;
+      double y = it_obs->x*sin(it_par->theta)  + it_obs->y*cos(it_par->theta) + it_par->y;
+
+      struct LandmarkObs new_inMap = {
+        it_obs->id,
+        x,   
+        y
+      };
+      obs_inMap.push_back(new_inMap);
     }
 
     // associate each transformed observation with a land mark identifier
-    dataAssociation(predicted, observations);
+    dataAssociation(predicted, obs_inMap);
 
     // calculate the particle's final weight...
-    double new_weight = 0;
-    for (auto it_obs=observations.begin(); it_obs!=observations.end(); ++it_obs) {
+    double new_weight = 1;
+    for (auto it_obs=obs_inMap.begin(); it_obs!=obs_inMap.end(); ++it_obs) {
+      //std::cout << "it_obs->x: " << it_obs->x << " pred.x: " << predicted[it_obs->id].x << std::endl;
       double error_x = it_obs->x - predicted[it_obs->id].x;
       double error_y = it_obs->y - predicted[it_obs->id].y;
+      if(DEBUG) {
+        std::cout << " it_obs->x: " << it_obs->x << " pred.x: " << predicted[it_obs->id].x << std::endl;
+        std::cout << " it_obs->y: " << it_obs->y << " pred.y: " << predicted[it_obs->id].y << std::endl;
+        std::cout << "  error_x: " << error_x << " error_y: " << error_y << std::endl;
+      }
 
       // compute Multivariate-Gaussian probability
       double gaussian = 1 / (2*M_PI*std_x*std_y);
@@ -180,11 +220,19 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
       gaussian *= exp(-1*( error_y*error_y / (2*std_y*std_y)));
 
       // sum together 
-      new_weight += gaussian;
+      new_weight *= gaussian;
+      if(DEBUG) {
+        std::cout << "  gaussian: " << gaussian << std::endl;
+        std::cout << "  new_weight: " << new_weight << std::endl;
+      }
     }
 
     // update weight of particle
     it_par->weight = new_weight;
+    if(DEBUG) {
+      std::cout << std::scientific
+                << "update weight: " << it_par->weight << std::endl;
+    }
   }
 
 }
@@ -198,6 +246,10 @@ void ParticleFilter::resample() {
   weights.clear();
   for (auto it_par=particles.begin(); it_par!=particles.end(); ++it_par) {
       weights.push_back(it_par->weight);
+      if(DEBUG) {
+        std::cout << std::scientific
+                  << "weight: " << it_par->weight << std::endl;
+      }
   }
 
   // setup distribution...
@@ -208,6 +260,7 @@ void ParticleFilter::resample() {
   std::vector<Particle> new_particles;
   for (int i=0; i<num_particles; i++) {
     int particle_index = distribution(gen); //get random idx based on weights
+     std::cout << "particle_index: " << particle_index << std::endl;
     new_particles.push_back(particles[particle_index]);
   }
 
