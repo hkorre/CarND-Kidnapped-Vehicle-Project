@@ -13,12 +13,9 @@
 #include "particle_filter.h"
 
 
-#define DEBUG    (0)
-
-#define NUM_PARTICLES  (100)  //(100)
+#define NUM_PARTICLES  (100)
 #define START_DIST     (1000)
 
-#define EPSILON        (1e-6)
 
 void ParticleFilter::init(double x, double y, double theta, double std[]) {
   // TODO: Set the number of particles. Initialize all particles to first position (based on estimates of 
@@ -29,20 +26,10 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
   num_particles = NUM_PARTICLES;
 
   std::default_random_engine gen;
-  
-  double std_x = std[0];
-  double std_y = std[1];
-  double std_theta = std[2];	 
 
-  if(DEBUG) {
-    std::cout << "x: " << x << " y: " << y << " theta: " << theta << std::endl;
-    std::cout << "std_x: " << std_x << " std_y: " << std_y << " std_theta: " << std_theta << std::endl;
-  }
-
-
-  std::normal_distribution<double> dist_x(x, std_x);
-  std::normal_distribution<double> dist_y(y, std_y);
-  std::normal_distribution<double> dist_theta(theta, std_theta);
+  std::normal_distribution<double> dist_x(x, std[0]);
+  std::normal_distribution<double> dist_y(y, std[1]);
+  std::normal_distribution<double> dist_theta(theta, std[2]);
 
   for (int i=0; i<num_particles; i++) {
     struct Particle new_particle = {
@@ -52,14 +39,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
       dist_theta(gen),  //theta
       1                 //weight
     };
-    if(DEBUG) {
-      std::cout << "new_particle: " << std::endl;
-      std::cout << "  i: " << new_particle.id 
-                << " x: " << new_particle.x
-                << " y: " << new_particle.y 
-                << " theta: " << new_particle.theta << std::endl;
-    }
-      particles.push_back(new_particle);
+    particles.push_back(new_particle);
   }
 
   is_initialized = true;
@@ -74,32 +54,16 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
   //  http://www.cplusplus.com/reference/random/default_random_engine/
 
   std::default_random_engine gen;
-  
-  double std_x = std_pos[0];
-  double std_y = std_pos[1];
-  double std_theta = std_pos[2];	 
 
-  std::normal_distribution<double> dist_x(0, std_x);
-  std::normal_distribution<double> dist_y(0, std_y);
-  std::normal_distribution<double> dist_theta(0, std_theta);
+  std::normal_distribution<double> dist_x(0, std_pos[0]);
+  std::normal_distribution<double> dist_y(0, std_pos[1]);
+  std::normal_distribution<double> dist_theta(0, std_pos[2]);
 
   for (auto it=particles.begin(); it!=particles.end(); ++it) {
-/*
-    if(yaw_rate<EPSILON) {
-      std::cout << "EPSILON" << std::endl;
-      it->x += velocity*delta_t*cos(it->theta) + dist_x(gen);
-      it->y += velocity*delta_t*sin(it->theta) + dist_y(gen);
-      it->theta += dist_theta(gen);
-    } else {
-      std::cout << "No EPSILON" << std::endl;
-      it->x += (velocity/yaw_rate)*(sin(it->theta + yaw_rate*delta_t) - sin(it->theta)) + dist_x(gen);
-      it->y += (velocity/yaw_rate)*(cos(it->theta) - cos(it->theta + yaw_rate*delta_t)) + dist_x(gen);
-      it->theta += yaw_rate*delta_t + dist_theta(gen);
-    }
-*/
-      it->x += (velocity/yaw_rate)*(sin(it->theta + yaw_rate*delta_t) - sin(it->theta)) + dist_x(gen);
-      it->y += (velocity/yaw_rate)*(cos(it->theta) - cos(it->theta + yaw_rate*delta_t)) + dist_x(gen);
-      it->theta += yaw_rate*delta_t + dist_theta(gen);
+    it->x += (velocity/yaw_rate)*(sin(it->theta + yaw_rate*delta_t) - sin(it->theta)) + dist_x(gen);
+    it->y += (velocity/yaw_rate)*(cos(it->theta) - cos(it->theta + yaw_rate*delta_t)) + dist_x(gen);
+    it->theta += yaw_rate*delta_t + dist_theta(gen);
+      //Note: we don't use simplified/small-yaw_rate eqns because they give bad results
   }
 }
 
@@ -122,11 +86,6 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
     }
 
     it_obs->id = min_index;
-
-/*
-    std::cout << "Pred: (" << predicted[min_index].x << "," << predicted[min_index].y << ")"
-              << " Obs: (" << it_obs->x << "," << it_obs->y << ")" << std::endl; 
-*/
   }
 }
 
@@ -143,22 +102,10 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
   //   3.33. 
   //   http://planning.cs.uiuc.edu/node99.html
 
-
-  std::cout << "updateWeights()..." << std::endl;
-
-
-  //TODO: What to do with sensor_range?
-
   double std_x = std_landmark[0];
   double std_y = std_landmark[1];
-  //std::cout << " std_lm[0]: " << std_x << " std_lm[1]: " << std_y << std::endl;
-
 
   for (auto it_par=particles.begin(); it_par!=particles.end(); ++it_par) {
-
-    if(DEBUG) {
-      std::cout << " particle id: " << it_par->id << std::endl;
-    }
 
     // find landmarks in range of particle that sensor can reach...
     std::vector<LandmarkObs> predicted;
@@ -177,7 +124,6 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
     // transform each observations from vehicle frame to the map frame...
     std::vector<LandmarkObs> obs_inMap;
     for (auto it_obs=observations.begin(); it_obs!=observations.end(); ++it_obs) {
-      //std::cout << " obs - x: " << x << " y: " << y << std::endl;
 
       //x_obsInMap = x_obsInCar*cos(theta_carInMap) - y_obsInCar*sin(theta_carInMap) + x_carInmap
       double x = it_obs->x*cos(it_par->theta) - it_obs->y*sin(it_par->theta) + it_par->x;
@@ -199,14 +145,8 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
     // calculate the particle's final weight...
     double new_weight = 1;
     for (auto it_obs=obs_inMap.begin(); it_obs!=obs_inMap.end(); ++it_obs) {
-      //std::cout << "it_obs->x: " << it_obs->x << " pred.x: " << predicted[it_obs->id].x << std::endl;
       double error_x = it_obs->x - predicted[it_obs->id].x;
       double error_y = it_obs->y - predicted[it_obs->id].y;
-      if(DEBUG) {
-        std::cout << " it_obs->x: " << it_obs->x << " pred.x: " << predicted[it_obs->id].x << std::endl;
-        std::cout << " it_obs->y: " << it_obs->y << " pred.y: " << predicted[it_obs->id].y << std::endl;
-        std::cout << "  error_x: " << error_x << " error_y: " << error_y << std::endl;
-      }
 
       // compute Multivariate-Gaussian probability
       double gaussian = 1 / (2*M_PI*std_x*std_y);
@@ -215,20 +155,11 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 
       // sum together 
       new_weight *= gaussian;
-      if(DEBUG) {
-        std::cout << "  gaussian: " << gaussian << std::endl;
-        std::cout << "  new_weight: " << new_weight << std::endl;
-      }
     }
 
     // update weight of particle
     it_par->weight = new_weight;
-    if(DEBUG) {
-      std::cout << std::scientific
-                << "update weight: " << it_par->weight << std::endl;
-    }
   }
-
 }
 
 void ParticleFilter::resample() {
@@ -240,10 +171,6 @@ void ParticleFilter::resample() {
   weights.clear();
   for (auto it_par=particles.begin(); it_par!=particles.end(); ++it_par) {
       weights.push_back(it_par->weight);
-      if(DEBUG) {
-        std::cout << std::scientific
-                  << "weight: " << it_par->weight << std::endl;
-      }
   }
 
   // setup distribution...
@@ -253,25 +180,21 @@ void ParticleFilter::resample() {
   // create new set of particles...
   std::vector<Particle> new_particles;
   for (int i=0; i<num_particles; i++) {
-    int particle_index = distribution(gen); //get random idx based on weights
-    if(DEBUG) {
-      std::cout << "particle_index: " << particle_index << std::endl;
-    }
+    int particle_index = distribution(gen);  //get random idx based on weights
     particles[particle_index].id = i;
     new_particles.push_back(particles[particle_index]);
   }
 
   // swap particle vectors
   particles = new_particles;
-
 }
 
 void ParticleFilter::write(std::string filename) {
-	// You don't need to modify this file.
-	std::ofstream dataFile;
-	dataFile.open(filename, std::ios::app);
-	for (int i = 0; i < num_particles; ++i) {
-		dataFile << particles[i].x << " " << particles[i].y << " " << particles[i].theta << "\n";
-	}
-	dataFile.close();
+  // You don't need to modify this file.
+  std::ofstream dataFile;
+  dataFile.open(filename, std::ios::app);
+  for (int i = 0; i < num_particles; ++i) {
+  	dataFile << particles[i].x << " " << particles[i].y << " " << particles[i].theta << "\n";
+  }
+  dataFile.close();
 }
